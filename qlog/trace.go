@@ -17,6 +17,7 @@ func (l topLevel) MarshalJSONObject(enc *gojay.Encoder) {
 	enc.StringKey("qlog_format", "NDJSON")
 	enc.StringKey("qlog_version", "draft-02")
 	enc.StringKeyOmitEmpty("title", "quic-go qlog")
+	enc.StringKey("code_version", quicGoVersion)
 	enc.ObjectKey("trace", l.trace)
 }
 
@@ -48,6 +49,7 @@ func (f commonFields) MarshalJSONObject(enc *gojay.Encoder) {
 	enc.StringKey("group_id", f.ODCID.String())
 	enc.StringKeyOmitEmpty("protocol_type", f.ProtocolType)
 	enc.Float64Key("reference_time", float64(f.ReferenceTime.UnixNano())/1e6)
+	enc.StringKey("time_format", "relative")
 }
 
 func (f commonFields) IsNil() bool { return false }

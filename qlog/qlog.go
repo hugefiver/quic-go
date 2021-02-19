@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -16,6 +17,34 @@ import (
 
 	"github.com/francoispqt/gojay"
 )
+
+// Setting of this only works when quic-go is used as a library.
+// When building a binary from this repository, the version can be set using the following go build flag:
+// -ldflags="-X github.com/lucas-clemente/quic-go/qlog.quicGoVersion=foobar"
+var quicGoVersion = "(devel)"
+
+func init() {
+	if quicGoVersion != "(devel)" { // variable set by ldflags
+		return
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok { // no build info available. This happens when quic-go is not used as a library.
+		return
+	}
+	for _, d := range info.Deps {
+		if d.Path == "github.com/lucas-clemente/quic-go" {
+			quicGoVersion = d.Version
+			if d.Replace != nil {
+				if len(d.Replace.Version) > 0 {
+					quicGoVersion = d.Version
+				} else {
+					quicGoVersion += " (replaced)"
+				}
+			}
+			break
+		}
+	}
+}
 
 const eventChanSize = 50
 
@@ -32,7 +61,7 @@ func NewTracer(getLogWriter func(p logging.Perspective, connectionID []byte) io.
 
 func (t *tracer) TracerForConnection(p logging.Perspective, odcid protocol.ConnectionID) logging.ConnectionTracer {
 	if w := t.getLogWriter(p, odcid.Bytes()); w != nil {
-		return newConnectionTracer(w, p, odcid)
+		return NewConnectionTracer(w, p, odcid)
 	}
 	return nil
 }
@@ -58,8 +87,8 @@ type connectionTracer struct {
 
 var _ logging.ConnectionTracer = &connectionTracer{}
 
-// newTracer creates a new connectionTracer to record a qlog.
-func newConnectionTracer(w io.WriteCloser, p protocol.Perspective, odcid protocol.ConnectionID) logging.ConnectionTracer {
+// NewConnectionTracer creates a new tracer to record a qlog for a connection.
+func NewConnectionTracer(w io.WriteCloser, p protocol.Perspective, odcid protocol.ConnectionID) logging.ConnectionTracer {
 	t := &connectionTracer{
 		w:             w,
 		perspective:   p,
