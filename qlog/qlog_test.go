@@ -153,7 +153,6 @@ var _ = Describe("Tracing", func() {
 				tracer.StartedConnection(
 					&net.UDPAddr{IP: net.IPv4(192, 168, 13, 37), Port: 42},
 					&net.UDPAddr{IP: net.IPv4(192, 168, 12, 34), Port: 24},
-					0xdeadbeef,
 					protocol.ConnectionID{1, 2, 3, 4},
 					protocol.ConnectionID{5, 6, 7, 8},
 				)
@@ -166,7 +165,6 @@ var _ = Describe("Tracing", func() {
 				Expect(ev).To(HaveKeyWithValue("src_port", float64(42)))
 				Expect(ev).To(HaveKeyWithValue("dst_ip", "192.168.12.34"))
 				Expect(ev).To(HaveKeyWithValue("dst_port", float64(24)))
-				Expect(ev).To(HaveKeyWithValue("quic_version", "deadbeef"))
 				Expect(ev).To(HaveKeyWithValue("src_cid", "01020304"))
 				Expect(ev).To(HaveKeyWithValue("dst_cid", "05060708"))
 			})
@@ -203,6 +201,17 @@ var _ = Describe("Tracing", func() {
 				Expect(ev).To(HaveKeyWithValue("owner", "remote"))
 				Expect(ev).To(HaveKeyWithValue("trigger", "stateless_reset"))
 				Expect(ev).To(HaveKeyWithValue("stateless_reset_token", "00112233445566778899aabbccddeeff"))
+			})
+
+			It("records connection closing due to version negotiation failure", func() {
+				tracer.ClosedConnection(logging.NewVersionNegotiationError([]logging.VersionNumber{1, 2, 3}))
+				entry := exportAndParseSingle()
+				Expect(entry.Time).To(BeTemporally("~", time.Now(), scaleDuration(10*time.Millisecond)))
+				Expect(entry.Name).To(Equal("transport:connection_closed"))
+				ev := entry.Event
+				Expect(ev).To(HaveLen(2))
+				Expect(ev).To(HaveKeyWithValue("owner", "remote"))
+				Expect(ev).To(HaveKeyWithValue("trigger", "version_negotiation"))
 			})
 
 			It("records application errors", func() {
@@ -719,6 +728,18 @@ var _ = Describe("Tracing", func() {
 				}
 				Expect(keyTypes).To(ContainElement("server_initial_secret"))
 				Expect(keyTypes).To(ContainElement("client_initial_secret"))
+			})
+
+			It("records dropped 0-RTT keys", func() {
+				tracer.DroppedEncryptionLevel(protocol.Encryption0RTT)
+				entries := exportAndParse()
+				Expect(entries).To(HaveLen(1))
+				entry := entries[0]
+				Expect(entry.Time).To(BeTemporally("~", time.Now(), scaleDuration(10*time.Millisecond)))
+				Expect(entry.Name).To(Equal("security:key_retired"))
+				ev := entry.Event
+				Expect(ev).To(HaveKeyWithValue("trigger", "tls"))
+				Expect(ev).To(HaveKeyWithValue("key_type", "server_0rtt_secret"))
 			})
 
 			It("records dropped keys", func() {

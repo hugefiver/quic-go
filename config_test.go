@@ -57,9 +57,13 @@ var _ = Describe("Config", func() {
 				f.Set(reflect.ValueOf(time.Hour))
 			case "TokenStore":
 				f.Set(reflect.ValueOf(NewLRUTokenStore(2, 3)))
-			case "MaxReceiveStreamFlowControlWindow":
+			case "InitialStreamReceiveWindow":
+				f.Set(reflect.ValueOf(uint64(1234)))
+			case "MaxStreamReceiveWindow":
 				f.Set(reflect.ValueOf(uint64(9)))
-			case "MaxReceiveConnectionFlowControlWindow":
+			case "InitialConnectionReceiveWindow":
+				f.Set(reflect.ValueOf(uint64(4321)))
+			case "MaxConnectionReceiveWindow":
 				f.Set(reflect.ValueOf(uint64(10)))
 			case "MaxIncomingStreams":
 				f.Set(reflect.ValueOf(int64(11)))
@@ -70,6 +74,8 @@ var _ = Describe("Config", func() {
 			case "KeepAlive":
 				f.Set(reflect.ValueOf(true))
 			case "EnableDatagrams":
+				f.Set(reflect.ValueOf(true))
+			case "DisablePathMTUDiscovery":
 				f.Set(reflect.ValueOf(true))
 			case "Tracer":
 				f.Set(reflect.ValueOf(mocklogging.NewMockTracer(mockCtrl)))
@@ -140,10 +146,13 @@ var _ = Describe("Config", func() {
 			c := populateConfig(&Config{})
 			Expect(c.Versions).To(Equal(protocol.SupportedVersions))
 			Expect(c.HandshakeIdleTimeout).To(Equal(protocol.DefaultHandshakeIdleTimeout))
-			Expect(c.MaxReceiveStreamFlowControlWindow).To(BeEquivalentTo(protocol.DefaultMaxReceiveStreamFlowControlWindow))
-			Expect(c.MaxReceiveConnectionFlowControlWindow).To(BeEquivalentTo(protocol.DefaultMaxReceiveConnectionFlowControlWindow))
+			Expect(c.InitialStreamReceiveWindow).To(BeEquivalentTo(protocol.DefaultInitialMaxStreamData))
+			Expect(c.MaxStreamReceiveWindow).To(BeEquivalentTo(protocol.DefaultMaxReceiveStreamFlowControlWindow))
+			Expect(c.InitialConnectionReceiveWindow).To(BeEquivalentTo(protocol.DefaultInitialMaxData))
+			Expect(c.MaxConnectionReceiveWindow).To(BeEquivalentTo(protocol.DefaultMaxReceiveConnectionFlowControlWindow))
 			Expect(c.MaxIncomingStreams).To(BeEquivalentTo(protocol.DefaultMaxIncomingStreams))
 			Expect(c.MaxIncomingUniStreams).To(BeEquivalentTo(protocol.DefaultMaxIncomingUniStreams))
+			Expect(c.DisablePathMTUDiscovery).To(BeFalse())
 		})
 
 		It("populates empty fields with default values, for the server", func() {

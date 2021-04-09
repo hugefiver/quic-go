@@ -180,7 +180,7 @@ var _ = Describe("Send Stream", func() {
 				defer GinkgoRecover()
 				defer close(done)
 				mockSender.EXPECT().onHasStreamData(streamID)
-				_, err := strWithTimeout.Write(getData(protocol.MaxReceivePacketSize + 3))
+				_, err := strWithTimeout.Write(getData(protocol.MaxPacketBufferSize + 3))
 				Expect(err).ToNot(HaveOccurred())
 			}()
 			waitForWrite()
@@ -208,7 +208,7 @@ var _ = Describe("Send Stream", func() {
 				defer GinkgoRecover()
 				defer close(done)
 				mockSender.EXPECT().onHasStreamData(streamID)
-				_, err := str.Write(getData(protocol.MaxReceivePacketSize))
+				_, err := str.Write(getData(protocol.MaxPacketBufferSize))
 				Expect(err).ToNot(HaveOccurred())
 			}()
 			waitForWrite()
@@ -652,10 +652,7 @@ var _ = Describe("Send Stream", func() {
 	Context("handling MAX_STREAM_DATA frames", func() {
 		It("informs the flow controller", func() {
 			mockFC.EXPECT().UpdateSendWindow(protocol.ByteCount(0x1337))
-			str.handleMaxStreamDataFrame(&wire.MaxStreamDataFrame{
-				StreamID:          streamID,
-				MaximumStreamData: 0x1337,
-			})
+			str.updateSendWindow(0x1337)
 		})
 
 		It("says when it has data for sending", func() {
@@ -670,10 +667,7 @@ var _ = Describe("Send Stream", func() {
 			}()
 			waitForWrite()
 			mockSender.EXPECT().onHasStreamData(streamID)
-			str.handleMaxStreamDataFrame(&wire.MaxStreamDataFrame{
-				StreamID:          streamID,
-				MaximumStreamData: 42,
-			})
+			str.updateSendWindow(42)
 			// make sure the Write go routine returns
 			str.closeForShutdown(nil)
 			Eventually(done).Should(BeClosed())

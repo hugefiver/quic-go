@@ -100,9 +100,9 @@ var _ = Describe("Tracing", func() {
 		It("trace the ConnectionStarted event", func() {
 			local := &net.UDPAddr{IP: net.IPv4(1, 2, 3, 4)}
 			remote := &net.UDPAddr{IP: net.IPv4(4, 3, 2, 1)}
-			tr1.EXPECT().StartedConnection(local, remote, VersionNumber(1234), ConnectionID{1, 2, 3, 4}, ConnectionID{4, 3, 2, 1})
-			tr2.EXPECT().StartedConnection(local, remote, VersionNumber(1234), ConnectionID{1, 2, 3, 4}, ConnectionID{4, 3, 2, 1})
-			tracer.StartedConnection(local, remote, VersionNumber(1234), ConnectionID{1, 2, 3, 4}, ConnectionID{4, 3, 2, 1})
+			tr1.EXPECT().StartedConnection(local, remote, ConnectionID{1, 2, 3, 4}, ConnectionID{4, 3, 2, 1})
+			tr2.EXPECT().StartedConnection(local, remote, ConnectionID{1, 2, 3, 4}, ConnectionID{4, 3, 2, 1})
+			tracer.StartedConnection(local, remote, ConnectionID{1, 2, 3, 4}, ConnectionID{4, 3, 2, 1})
 		})
 
 		It("traces the ClosedConnection event", func() {
@@ -188,6 +188,12 @@ var _ = Describe("Tracing", func() {
 			tr1.EXPECT().UpdatedMetrics(rttStats, ByteCount(1337), ByteCount(42), 13)
 			tr2.EXPECT().UpdatedMetrics(rttStats, ByteCount(1337), ByteCount(42), 13)
 			tracer.UpdatedMetrics(rttStats, 1337, 42, 13)
+		})
+
+		It("traces the AcknowledgedPacket event", func() {
+			tr1.EXPECT().AcknowledgedPacket(EncryptionHandshake, PacketNumber(42))
+			tr2.EXPECT().AcknowledgedPacket(EncryptionHandshake, PacketNumber(42))
+			tracer.AcknowledgedPacket(EncryptionHandshake, 42)
 		})
 
 		It("traces the LostPacket event", func() {

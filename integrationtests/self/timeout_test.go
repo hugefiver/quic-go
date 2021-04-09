@@ -16,6 +16,7 @@ import (
 	quic "github.com/lucas-clemente/quic-go"
 	quicproxy "github.com/lucas-clemente/quic-go/integrationtests/tools/proxy"
 	"github.com/lucas-clemente/quic-go/internal/utils"
+	"github.com/lucas-clemente/quic-go/logging"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -117,7 +118,7 @@ var _ = Describe("Timeout tests", func() {
 		server, err := quic.ListenAddr(
 			"localhost:0",
 			getTLSConfig(),
-			getQuicConfig(nil),
+			getQuicConfig(&quic.Config{DisablePathMTUDiscovery: true}),
 		)
 		Expect(err).ToNot(HaveOccurred())
 		defer server.Close()
@@ -146,7 +147,7 @@ var _ = Describe("Timeout tests", func() {
 		sess, err := quic.DialAddr(
 			fmt.Sprintf("localhost:%d", proxy.LocalPort()),
 			getTLSClientConfig(),
-			getQuicConfig(&quic.Config{MaxIdleTimeout: idleTimeout}),
+			getQuicConfig(&quic.Config{DisablePathMTUDiscovery: true, MaxIdleTimeout: idleTimeout}),
 		)
 		Expect(err).ToNot(HaveOccurred())
 		strIn, err := sess.AcceptStream(context.Background())
@@ -187,7 +188,7 @@ var _ = Describe("Timeout tests", func() {
 			server, err := quic.ListenAddr(
 				"localhost:0",
 				getTLSConfig(),
-				getQuicConfig(nil),
+				getQuicConfig(&quic.Config{DisablePathMTUDiscovery: true}),
 			)
 			Expect(err).ToNot(HaveOccurred())
 			defer server.Close()
@@ -201,13 +202,17 @@ var _ = Describe("Timeout tests", func() {
 				close(serverSessionClosed)
 			}()
 
+			tr := newPacketTracer()
 			sess, err := quic.DialAddr(
 				fmt.Sprintf("localhost:%d", server.Addr().(*net.UDPAddr).Port),
 				getTLSClientConfig(),
-				getQuicConfig(&quic.Config{MaxIdleTimeout: idleTimeout}),
+				getQuicConfig(&quic.Config{
+					MaxIdleTimeout:          idleTimeout,
+					Tracer:                  newTracer(func() logging.ConnectionTracer { return tr }),
+					DisablePathMTUDiscovery: true,
+				}),
 			)
 			Expect(err).ToNot(HaveOccurred())
-			startTime := time.Now()
 			done := make(chan struct{})
 			go func() {
 				defer GinkgoRecover()
@@ -216,8 +221,26 @@ var _ = Describe("Timeout tests", func() {
 				close(done)
 			}()
 			Eventually(done, 2*idleTimeout).Should(BeClosed())
-			dur := time.Since(startTime)
-			Expect(dur).To(And(
+			var lastAckElicitingPacketSentAt time.Time
+			for _, p := range tr.getSentPackets() {
+				var hasAckElicitingFrame bool
+				for _, f := range p.frames {
+					if _, ok := f.(*logging.AckFrame); ok {
+						continue
+					}
+					hasAckElicitingFrame = true
+					break
+				}
+				if hasAckElicitingFrame {
+					lastAckElicitingPacketSentAt = p.time
+				}
+			}
+			rcvdPackets := tr.getRcvdPackets()
+			lastPacketRcvdAt := rcvdPackets[len(rcvdPackets)-1].time
+			// We're ignoring here that only the first ack-eliciting packet sent resets the idle timeout.
+			// This is ok since we're dealing with a lossless connection here,
+			// and we'd expect to receive an ACK for additional other ack-eliciting packet sent.
+			Expect(time.Since(utils.MaxTime(lastAckElicitingPacketSentAt, lastPacketRcvdAt))).To(And(
 				BeNumerically(">=", idleTimeout),
 				BeNumerically("<", idleTimeout*6/5),
 			))
@@ -232,7 +255,7 @@ var _ = Describe("Timeout tests", func() {
 			server, err := quic.ListenAddr(
 				"localhost:0",
 				getTLSConfig(),
-				getQuicConfig(nil),
+				getQuicConfig(&quic.Config{DisablePathMTUDiscovery: true}),
 			)
 			Expect(err).ToNot(HaveOccurred())
 			defer server.Close()
@@ -262,7 +285,7 @@ var _ = Describe("Timeout tests", func() {
 			sess, err := quic.DialAddr(
 				fmt.Sprintf("localhost:%d", proxy.LocalPort()),
 				getTLSClientConfig(),
-				getQuicConfig(&quic.Config{MaxIdleTimeout: idleTimeout}),
+				getQuicConfig(&quic.Config{MaxIdleTimeout: idleTimeout, DisablePathMTUDiscovery: true}),
 			)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -303,7 +326,7 @@ var _ = Describe("Timeout tests", func() {
 		server, err := quic.ListenAddr(
 			"localhost:0",
 			getTLSConfig(),
-			getQuicConfig(nil),
+			getQuicConfig(&quic.Config{DisablePathMTUDiscovery: true}),
 		)
 		Expect(err).ToNot(HaveOccurred())
 		defer server.Close()
@@ -331,8 +354,9 @@ var _ = Describe("Timeout tests", func() {
 			fmt.Sprintf("localhost:%d", proxy.LocalPort()),
 			getTLSClientConfig(),
 			getQuicConfig(&quic.Config{
-				MaxIdleTimeout: idleTimeout,
-				KeepAlive:      true,
+				MaxIdleTimeout:          idleTimeout,
+				KeepAlive:               true,
+				DisablePathMTUDiscovery: true,
 			}),
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -403,7 +427,7 @@ var _ = Describe("Timeout tests", func() {
 			ln, err := quic.Listen(
 				&faultyConn{PacketConn: conn, MaxPackets: maxPackets},
 				getTLSConfig(),
-				getQuicConfig(nil),
+				getQuicConfig(&quic.Config{DisablePathMTUDiscovery: true}),
 			)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -420,8 +444,9 @@ var _ = Describe("Timeout tests", func() {
 					fmt.Sprintf("localhost:%d", ln.Addr().(*net.UDPAddr).Port),
 					getTLSClientConfig(),
 					getQuicConfig(&quic.Config{
-						HandshakeIdleTimeout: handshakeTimeout,
-						MaxIdleTimeout:       handshakeTimeout,
+						HandshakeIdleTimeout:    handshakeTimeout,
+						MaxIdleTimeout:          handshakeTimeout,
+						DisablePathMTUDiscovery: true,
 					}),
 				)
 				if err != nil {
@@ -453,9 +478,10 @@ var _ = Describe("Timeout tests", func() {
 				"localhost:0",
 				getTLSConfig(),
 				getQuicConfig(&quic.Config{
-					HandshakeIdleTimeout: handshakeTimeout,
-					MaxIdleTimeout:       handshakeTimeout,
-					KeepAlive:            true,
+					HandshakeIdleTimeout:    handshakeTimeout,
+					MaxIdleTimeout:          handshakeTimeout,
+					KeepAlive:               true,
+					DisablePathMTUDiscovery: true,
 				}),
 			)
 			Expect(err).ToNot(HaveOccurred())
@@ -480,7 +506,7 @@ var _ = Describe("Timeout tests", func() {
 					ln.Addr(),
 					"localhost",
 					getTLSClientConfig(),
-					getQuicConfig(nil),
+					getQuicConfig(&quic.Config{DisablePathMTUDiscovery: true}),
 				)
 				if err != nil {
 					clientErrChan <- err

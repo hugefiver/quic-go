@@ -2,6 +2,7 @@ package quic
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"time"
@@ -32,6 +33,8 @@ const (
 	VersionDraft29 = protocol.VersionDraft29
 	// VersionDraft32 is IETF QUIC draft-32
 	VersionDraft32 = protocol.VersionDraft32
+	// VersionDraft34 is IETF QUIC draft-34
+	VersionDraft34 = protocol.VersionDraft34
 )
 
 // A Token can be used to verify the ownership of the client address.
@@ -64,6 +67,13 @@ type TokenStore interface {
 // An ErrorCode is an application-defined error code.
 // Valid values range between 0 and MAX_UINT62.
 type ErrorCode = protocol.ApplicationErrorCode
+
+// Err0RTTRejected is the returned from:
+// * Open{Uni}Stream{Sync}
+// * Accept{Uni}Stream
+// * Stream.Read and Stream.Write
+// when the server rejects a 0-RTT connection attempt.
+var Err0RTTRejected = errors.New("0-RTT rejected")
 
 // Stream is the interface implemented by QUIC streams
 type Stream interface {
@@ -207,6 +217,8 @@ type EarlySession interface {
 	// Data sent before completion of the handshake is encrypted with 1-RTT keys.
 	// Note that the client's identity hasn't been verified yet.
 	HandshakeComplete() context.Context
+
+	NextSession() Session
 }
 
 // Config contains all configuration data needed for a QUIC server or client.
@@ -245,12 +257,22 @@ type Config struct {
 	// The key used to store tokens is the ServerName from the tls.Config, if set
 	// otherwise the token is associated with the server's IP address.
 	TokenStore TokenStore
-	// MaxReceiveStreamFlowControlWindow is the maximum stream-level flow control window for receiving data.
-	// If this value is zero, it will default to 1 MB for the server and 6 MB for the client.
-	MaxReceiveStreamFlowControlWindow uint64
-	// MaxReceiveConnectionFlowControlWindow is the connection-level flow control window for receiving data.
-	// If this value is zero, it will default to 1.5 MB for the server and 15 MB for the client.
-	MaxReceiveConnectionFlowControlWindow uint64
+	// InitialStreamReceiveWindow is the initial size of the stream-level flow control window for receiving data.
+	// If the application is consuming data quickly enough, the flow control auto-tuning algorithm
+	// will increase the window up to MaxStreamReceiveWindow.
+	// If this value is zero, it will default to 512 KB.
+	InitialStreamReceiveWindow uint64
+	// MaxStreamReceiveWindow is the maximum stream-level flow control window for receiving data.
+	// If this value is zero, it will default to 6 MB.
+	MaxStreamReceiveWindow uint64
+	// InitialConnectionReceiveWindow is the initial size of the stream-level flow control window for receiving data.
+	// If the application is consuming data quickly enough, the flow control auto-tuning algorithm
+	// will increase the window up to MaxConnectionReceiveWindow.
+	// If this value is zero, it will default to 512 KB.
+	InitialConnectionReceiveWindow uint64
+	// MaxConnectionReceiveWindow is the connection-level flow control window for receiving data.
+	// If this value is zero, it will default to 15 MB.
+	MaxConnectionReceiveWindow uint64
 	// MaxIncomingStreams is the maximum number of concurrent bidirectional streams that a peer is allowed to open.
 	// Values above 2^60 are invalid.
 	// If not set, it will default to 100.
@@ -266,6 +288,9 @@ type Config struct {
 	StatelessResetKey []byte
 	// KeepAlive defines whether this peer will periodically send a packet to keep the connection alive.
 	KeepAlive bool
+	// DisablePathMTUDiscovery disables Path MTU Discovery (RFC 8899).
+	// Packets will then be at most 1252 (IPv4) / 1232 (IPv6) bytes in size.
+	DisablePathMTUDiscovery bool
 	// See https://datatracker.ietf.org/doc/draft-ietf-quic-datagram/.
 	// Datagrams will only be available when both peers enable datagram support.
 	EnableDatagrams bool

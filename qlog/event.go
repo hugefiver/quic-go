@@ -59,11 +59,8 @@ type eventConnectionStarted struct {
 	SrcAddr  *net.UDPAddr
 	DestAddr *net.UDPAddr
 
-	Version          protocol.VersionNumber
 	SrcConnectionID  protocol.ConnectionID
 	DestConnectionID protocol.ConnectionID
-
-	// TODO: add ALPN
 }
 
 var _ eventDetails = &eventConnectionStarted{}
@@ -82,7 +79,6 @@ func (e eventConnectionStarted) MarshalJSONObject(enc *gojay.Encoder) {
 	enc.IntKey("src_port", e.SrcAddr.Port)
 	enc.StringKey("dst_ip", e.DestAddr.IP.String())
 	enc.IntKey("dst_port", e.DestAddr.Port)
-	enc.StringKey("quic_version", versionNumber(e.Version).String())
 	enc.StringKey("src_cid", connectionID(e.SrcConnectionID).String())
 	enc.StringKey("dst_cid", connectionID(e.DestConnectionID).String())
 }
@@ -96,7 +92,6 @@ func (e eventConnectionClosed) Name() string       { return "connection_closed" 
 func (e eventConnectionClosed) IsNil() bool        { return false }
 
 func (e eventConnectionClosed) MarshalJSONObject(enc *gojay.Encoder) {
-	// TODO: add version mismatch
 	if token, ok := e.Reason.StatelessReset(); ok {
 		enc.StringKey("owner", ownerRemote.String())
 		enc.StringKey("trigger", "stateless_reset")
@@ -123,6 +118,10 @@ func (e eventConnectionClosed) MarshalJSONObject(enc *gojay.Encoder) {
 		}
 		enc.StringKey("owner", owner.String())
 		enc.StringKey("connection_code", transportError(code).String())
+	}
+	if _, ok := e.Reason.VersionNegotiation(); ok {
+		enc.StringKey("owner", ownerRemote.String())
+		enc.StringKey("trigger", "version_negotiation")
 	}
 }
 

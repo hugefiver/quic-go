@@ -335,7 +335,7 @@ func (p *TransportParameters) Marshal(pers protocol.Perspective) []byte {
 	// idle_timeout
 	p.marshalVarintParam(b, maxIdleTimeoutParameterID, uint64(p.MaxIdleTimeout/time.Millisecond))
 	// max_packet_size
-	p.marshalVarintParam(b, maxUDPPayloadSizeParameterID, uint64(protocol.MaxReceivePacketSize))
+	p.marshalVarintParam(b, maxUDPPayloadSizeParameterID, uint64(protocol.MaxPacketBufferSize))
 	// max_ack_delay
 	// Only send it if is different from the default value.
 	if p.MaxAckDelay != protocol.DefaultMaxAckDelay {
@@ -440,13 +440,14 @@ func (p *TransportParameters) UnmarshalFromSessionTicket(r *bytes.Reader) error 
 }
 
 // ValidFor0RTT checks if the transport parameters match those saved in the session ticket.
-func (p *TransportParameters) ValidFor0RTT(tp *TransportParameters) bool {
-	return p.InitialMaxStreamDataBidiLocal == tp.InitialMaxStreamDataBidiLocal &&
-		p.InitialMaxStreamDataBidiRemote == tp.InitialMaxStreamDataBidiRemote &&
-		p.InitialMaxStreamDataUni == tp.InitialMaxStreamDataUni &&
-		p.InitialMaxData == tp.InitialMaxData &&
-		p.MaxBidiStreamNum == tp.MaxBidiStreamNum &&
-		p.MaxUniStreamNum == tp.MaxUniStreamNum
+func (p *TransportParameters) ValidFor0RTT(saved *TransportParameters) bool {
+	return p.InitialMaxStreamDataBidiLocal >= saved.InitialMaxStreamDataBidiLocal &&
+		p.InitialMaxStreamDataBidiRemote >= saved.InitialMaxStreamDataBidiRemote &&
+		p.InitialMaxStreamDataUni >= saved.InitialMaxStreamDataUni &&
+		p.InitialMaxData >= saved.InitialMaxData &&
+		p.MaxBidiStreamNum >= saved.MaxBidiStreamNum &&
+		p.MaxUniStreamNum >= saved.MaxUniStreamNum &&
+		p.ActiveConnectionIDLimit == saved.ActiveConnectionIDLimit
 }
 
 // String returns a string representation, intended for logging.

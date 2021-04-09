@@ -328,8 +328,8 @@ var _ = Describe("MITM test", func() {
 				// expects hdr from an Initial packet intercepted from client
 				sendForgedInitialPacketWithAck := func(conn net.PacketConn, remoteAddr net.Addr, hdr *wire.Header) {
 					// Fake Initial with ACK for packet 2 (unsent)
-					ackFrame := testutils.ComposeAckFrame(2, 2)
-					initialPacket := testutils.ComposeInitialPacket(hdr.DestConnectionID, hdr.SrcConnectionID, hdr.Version, hdr.DestConnectionID, []wire.Frame{ackFrame})
+					ack := &wire.AckFrame{AckRanges: []wire.AckRange{{Smallest: 2, Largest: 2}}}
+					initialPacket := testutils.ComposeInitialPacket(hdr.DestConnectionID, hdr.SrcConnectionID, hdr.Version, hdr.DestConnectionID, []wire.Frame{ack})
 					_, err := conn.WriteTo(initialPacket, remoteAddr)
 					Expect(err).ToNot(HaveOccurred())
 				}
@@ -371,7 +371,7 @@ var _ = Describe("MITM test", func() {
 					}
 					err := runTest(delayCb)
 					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("No compatible QUIC version found."))
+					Expect(err.Error()).To(ContainSubstring("no compatible QUIC version found"))
 				})
 
 				// times out, because client doesn't accept subsequent real retry packets from server

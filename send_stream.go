@@ -20,7 +20,7 @@ type sendStreamI interface {
 	hasData() bool
 	popStreamFrame(maxBytes protocol.ByteCount) (*ackhandler.Frame, bool)
 	closeForShutdown(error)
-	handleMaxStreamDataFrame(*wire.MaxStreamDataFrame)
+	updateSendWindow(protocol.ByteCount)
 }
 
 type sendStream struct {
@@ -191,7 +191,7 @@ func (s *sendStream) canBufferStreamFrame() bool {
 	if s.nextFrame != nil {
 		l = s.nextFrame.DataLen()
 	}
-	return l+protocol.ByteCount(len(s.dataForWriting)) <= protocol.MaxReceivePacketSize
+	return l+protocol.ByteCount(len(s.dataForWriting)) <= protocol.MaxPacketBufferSize
 }
 
 // popStreamFrame returns the next STREAM frame that is supposed to be sent on this stream
@@ -437,12 +437,12 @@ func (s *sendStream) cancelWriteImpl(errorCode protocol.ApplicationErrorCode, wr
 	}
 }
 
-func (s *sendStream) handleMaxStreamDataFrame(frame *wire.MaxStreamDataFrame) {
+func (s *sendStream) updateSendWindow(limit protocol.ByteCount) {
 	s.mutex.Lock()
 	hasStreamData := s.dataForWriting != nil || s.nextFrame != nil
 	s.mutex.Unlock()
 
-	s.flowController.UpdateSendWindow(frame.MaximumStreamData)
+	s.flowController.UpdateSendWindow(limit)
 	if hasStreamData {
 		s.sender.onHasStreamData(s.streamID)
 	}

@@ -466,7 +466,7 @@ func (h *cryptoSetup) GetSessionTicket() ([]byte, error) {
 func (h *cryptoSetup) accept0RTT(sessionTicketData []byte) bool {
 	var t sessionTicket
 	if err := t.Unmarshal(sessionTicketData); err != nil {
-		h.logger.Debugf("Unmarshaling transport parameters from session ticket failed: %s", err.Error())
+		h.logger.Debugf("Unmarshalling transport parameters from session ticket failed: %s", err.Error())
 		return false
 	}
 	valid := h.ourParams.ValidFor0RTT(t.Parameters)
@@ -617,6 +617,9 @@ func (h *cryptoSetup) SetWriteKey(encLevel qtls.EncryptionLevel, suite *qtls.Cip
 		if h.zeroRTTSealer != nil {
 			h.zeroRTTSealer = nil
 			h.logger.Debugf("Dropping 0-RTT keys.")
+			if h.tracer != nil {
+				h.tracer.DroppedEncryptionLevel(protocol.Encryption0RTT)
+			}
 		}
 	default:
 		panic("unexpected write encryption level")
@@ -778,6 +781,9 @@ func (h *cryptoSetup) Get1RTTOpener() (ShortHeaderOpener, error) {
 	if h.zeroRTTOpener != nil && time.Since(h.handshakeCompleteTime) > 3*h.rttStats.PTO(true) {
 		h.zeroRTTOpener = nil
 		h.logger.Debugf("Dropping 0-RTT keys.")
+		if h.tracer != nil {
+			h.tracer.DroppedEncryptionLevel(protocol.Encryption0RTT)
+		}
 	}
 
 	if !h.has1RTTOpener {

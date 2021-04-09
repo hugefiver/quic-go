@@ -5,11 +5,11 @@ import "time"
 // DesiredReceiveBufferSize is the kernel UDP receive buffer size that we'd like to use.
 const DesiredReceiveBufferSize = (1 << 20) * 2 // 2 MB
 
-// MaxPacketSizeIPv4 is the maximum packet size that we use for sending IPv4 packets.
-const MaxPacketSizeIPv4 = 1252
+// InitialPacketSizeIPv4 is the maximum packet size that we use for sending IPv4 packets.
+const InitialPacketSizeIPv4 = 1252
 
-// MaxPacketSizeIPv6 is the maximum packet size that we use for sending IPv6 packets.
-const MaxPacketSizeIPv6 = 1232
+// InitialPacketSizeIPv6 is the maximum packet size that we use for sending IPv6 packets.
+const InitialPacketSizeIPv6 = 1232
 
 // MaxCongestionWindowPackets is the maximum congestion window in packet.
 const MaxCongestionWindowPackets = 10000
@@ -21,17 +21,17 @@ const MaxUndecryptablePackets = 32
 // This is the value that Chromium is using
 const ConnectionFlowControlMultiplier = 1.5
 
-// InitialMaxStreamData is the stream-level flow control window for receiving data
-const InitialMaxStreamData = (1 << 10) * 512 // 512 kb
+// DefaultInitialMaxStreamData is the default initial stream-level flow control window for receiving data
+const DefaultInitialMaxStreamData = (1 << 10) * 512 // 512 kb
 
-// InitialMaxData is the connection-level flow control window for receiving data
-const InitialMaxData = ConnectionFlowControlMultiplier * InitialMaxStreamData
+// DefaultInitialMaxData is the connection-level flow control window for receiving data
+const DefaultInitialMaxData = ConnectionFlowControlMultiplier * DefaultInitialMaxStreamData
 
-// DefaultMaxReceiveStreamFlowControlWindow is the default maximum stream-level flow control window for receiving data, for the server
+// DefaultMaxReceiveStreamFlowControlWindow is the default maximum stream-level flow control window for receiving data
 const DefaultMaxReceiveStreamFlowControlWindow = 6 * (1 << 20) // 6 MB
 
-// DefaultMaxReceiveConnectionFlowControlWindow is the default connection-level flow control window for receiving data, for the server
-const DefaultMaxReceiveConnectionFlowControlWindow = 15 * (1 << 20) // 12 MB
+// DefaultMaxReceiveConnectionFlowControlWindow is the default connection-level flow control window for receiving data
+const DefaultMaxReceiveConnectionFlowControlWindow = 15 * (1 << 20) // 15 MB
 
 // WindowUpdateThreshold is the fraction of the receive window that has to be consumed before an higher offset is advertised to the client
 const WindowUpdateThreshold = 0.25
@@ -135,7 +135,7 @@ const MaxAckFrameSize ByteCount = 1000
 // MaxDatagramFrameSize is the maximum size of a DATAGRAM frame as defined in
 // https://datatracker.ietf.org/doc/draft-pauly-quic-datagram/.
 // The size is chosen such that a DATAGRAM frame fits into a QUIC packet.
-const MaxDatagramFrameSize ByteCount = 1200
+const MaxDatagramFrameSize ByteCount = 1220
 
 // DatagramRcvQueueLen is the length of the receive queue for DATAGRAM frames.
 // See https://datatracker.ietf.org/doc/draft-pauly-quic-datagram/.
